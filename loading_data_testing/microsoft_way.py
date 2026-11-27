@@ -35,6 +35,11 @@ with rasterio.open(signed.assets["B04"].href) as src:
     red = src.read(1, out_shape=(800, 800)).astype("float32") / 10000
 with rasterio.open(signed.assets["B08"].href) as src:
     nir = src.read(1, out_shape=(800, 800)).astype("float32") / 10000
+with rasterio.open(signed.assets["B11"].href) as src:
+    swir = src.read(1, out_shape=(800, 800)).astype("float32") / 10000
+
+# Calculating NDBI
+ndbi = (swir - nir) / (swir + nir)
 
 # Calculating NDVI
 # Healthy green pixel is about 0.45 in NIR and 0.04 in Red
@@ -42,21 +47,20 @@ ndvi = (nir - red) / (nir + red)
 print(f"NDVI values : min : max : mean -->{ndvi.min()}: {ndvi.max()}: {ndvi.mean()}")
 # Graph
 fig, axes = plt.subplots(
-    1, 3,
-    figsize=(13, 6),
-    gridspec_kw={"width_ratios": [1, 1, 0.04]},
+    1, 5,
+    figsize=(18, 6),
+    gridspec_kw={"width_ratios": [1, 1, 0.04, 1, 0.04]},
 )
-
 axes[0].imshow(img.transpose(1, 2, 0))
 axes[0].set_title("True color")
 axes[0].axis("off")
-
 ndvi_image = axes[1].imshow(ndvi, cmap="RdYlGn", vmin=-0.2, vmax=0.9)
 axes[1].set_title("NDVI")
 axes[1].axis("off")
-
 fig.colorbar(ndvi_image, cax=axes[2])
+ndbi_image = axes[3].imshow(ndbi, cmap="RdBu_r", vmin=-0.4, vmax=0.4)
+axes[3].set_title("NDBI")
+axes[3].axis("off")
+fig.colorbar(ndbi_image, cax=axes[4])
 plt.tight_layout()
 plt.show()
-
-
