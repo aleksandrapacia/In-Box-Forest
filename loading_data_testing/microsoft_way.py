@@ -1,0 +1,48 @@
+import pystac
+import planetary_computer as pc
+import rasterio
+import matplotlib.pyplot as plt
+
+item_url = "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2C_MSIL2A_20261028T095121_R079_T34UCA_20261028T132804"
+
+# Load the individual item metadata
+item = pystac.Item.from_file(item_url) # metadata
+
+
+# Open one of the data assets (other asset keys to use: 'B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B09', 'B11', 'B12', 'B8A', 'SCL', 'WVP', 'visual')
+# AOT - air above the place, how much dust and haze was in the air 
+# visual - a photo made for eyes, true-color image (0,255) pixels
+asset = pc.sign(item).assets["visual"].href # sign returns a copy of it
+
+# Read the asset from storage and print the metadata
+with rasterio.open(asset) as src:
+	# outshape = (band, rows, columns)
+	img = src.read(out_shape=(3,800,800))
+	print(src.count)
+	print(src.dtypes)
+	print(src.descriptions)
+
+# Identifying bands in asset
+for key, asset in item.assets.items():
+	print(key, "-", asset.title)
+
+# Giving permission to read GeoTIFF
+
+signed = pc.sign(item)
+
+# Retrieving important bands
+with rasterio.open(signed.assets["B04"].href) as src:
+    red = src.read(1, out_shape=(800, 800)).astype("float32") / 10000
+with rasterio.open(signed.assets["B08"].href) as src:
+    nir = src.read(1, out_shape=(800, 800)).astype("float32") / 10000
+
+# Calculating NDVI
+# Healthy green pixel is about 0.45 in NIR and 0.04 in Red
+ndvi = (nir - red) / (nir + red)
+
+# Graph
+fig, axes = plt.subplots(1,2,figsize=(12,6))
+plt.show()
+
+
+
