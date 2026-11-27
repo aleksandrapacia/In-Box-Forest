@@ -2,6 +2,7 @@ import pystac
 import planetary_computer as pc
 import rasterio
 import matplotlib.pyplot as plt
+import numpy as np
 
 item_url = "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2C_MSIL2A_20261028T095121_R079_T34UCA_20261028T132804"
 
@@ -37,6 +38,8 @@ with rasterio.open(signed.assets["B08"].href) as src:
     nir = src.read(1, out_shape=(800, 800)).astype("float32") / 10000
 with rasterio.open(signed.assets["B11"].href) as src:
     swir = src.read(1, out_shape=(800, 800)).astype("float32") / 10000
+with rasterio.open(signed.assets["SCL"].href) as src:
+    scl = src.read(1, out_shape=(800, 800))
 
 # Calculating NDBI
 ndbi = (swir - nir) / (swir + nir)
@@ -45,6 +48,16 @@ ndbi = (swir - nir) / (swir + nir)
 # Healthy green pixel is about 0.45 in NIR and 0.04 in Red
 ndvi = (nir - red) / (nir + red)
 print(f"NDVI values : min : max : mean -->{ndvi.min()}: {ndvi.max()}: {ndvi.mean()}")
+
+# Classes 
+cloud = np.isin(scl, [0, 1, 3, 8, 9, 10, 11])
+ndvi = np.where(cloud, np.nan, ndvi)
+ndbi = np.where(cloud, np.nan, ndbi)
+print(np.nanmin(ndvi), np.nanmax(ndvi), np.nanmean(ndvi))
+
+rgb = img.transpose(1, 2, 0).copy()
+rgb[cloud] = 255
+
 # Graph
 fig, axes = plt.subplots(
     1, 5,
@@ -52,6 +65,7 @@ fig, axes = plt.subplots(
     gridspec_kw={"width_ratios": [1, 1, 0.04, 1, 0.04]},
 )
 axes[0].imshow(img.transpose(1, 2, 0))
+axes[0].imshow(rgb)
 axes[0].set_title("True color")
 axes[0].axis("off")
 ndvi_image = axes[1].imshow(ndvi, cmap="RdYlGn", vmin=-0.2, vmax=0.9)
@@ -64,3 +78,7 @@ axes[3].axis("off")
 fig.colorbar(ndbi_image, cax=axes[4])
 plt.tight_layout()
 plt.show()
+
+
+# 
+
