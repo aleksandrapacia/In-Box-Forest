@@ -3,6 +3,23 @@ import planetary_computer as pc
 import rasterio
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Rectangle
+from matplotlib.widgets import RectangleSelector
+
+# choosing the area
+def mark(ax, row, col, height, width):
+    # imshow puts column on x and row on y, with row 0 at the top.
+    return ax.add_patch(
+        Rectangle((col, row), width, height, fill=False, edgecolor="red", linewidth=2)
+    )
+
+
+def area_line(name, array, row, col, height, width):
+    patch = array[row:row + height, col:col + width]
+    return (
+        f"{name} mean {np.nanmean(patch):.2f}  "
+        f"min {np.nanmin(patch):.2f}  max {np.nanmax(patch):.2f}"
+    )
 
 item_url = "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2C_MSIL2A_20261028T095121_R079_T34UCA_20261028T132804"
 fill_url = "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20261023T095049_R079_T34UCA_20261023T134641"
@@ -115,8 +132,58 @@ ndbi_image = axes[3].imshow(ndbi, cmap="RdBu_r", vmin=-0.4, vmax=0.4)
 axes[3].set_title("NDBI")
 axes[3].axis("off")
 fig.colorbar(ndbi_image, cax=axes[4])
+
 plt.tight_layout()
-plt.savefig('no_cloud.png')
+fig.subplots_adjust(bottom=0.16)
+fig.text(
+    0.5,
+    0.07,
+    "Drag a rectangle on the true color map.",
+    ha="center",
+    va="center",
+    fontsize=12,
+)
+result_text = fig.text(0.5, 0.025, "", ha="center", va="center", fontsize=11)
+picked_boxes = []
+
+def clear_result():
+    result_text.set_text("")
+    fig.canvas.draw_idle()
+
+result_timer = fig.canvas.new_timer(interval=4000)
+result_timer.single_shot = True
+result_timer.add_callback(clear_result)
+
+def on_select(eclick, erelease):
+    row = int(min(eclick.ydata, erelease.ydata))
+    col = int(min(eclick.xdata, erelease.xdata))
+    height = int(abs(erelease.ydata - eclick.ydata))
+    width = int(abs(erelease.xdata - eclick.xdata))
+    if height < 1 or width < 1:
+        return
+    for patch in picked_boxes:
+        patch.remove()
+    picked_boxes.clear()
+    for ax in (axes[0], axes[1], axes[3]):
+        picked_boxes.append(mark(ax, row, col, height, width))
+    result_text.set_text(
+        area_line("NDVI", ndvi, row, col, height, width)
+        + "    "
+        + area_line("NDBI", ndbi, row, col, height, width)
+    )
+    selector.set_visible(False)
+    fig.canvas.draw_idle()
+    result_timer.stop()
+    result_timer.start()
+
+selector = RectangleSelector(
+    axes[0],
+    on_select,
+    useblit=True,
+    button=[1],
+    props={"facecolor": "none", "edgecolor": "red", "linewidth": 2},
+)
+plt.savefig("no_cloud.png")
 plt.show()
 
 
